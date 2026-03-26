@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useApp } from '@/lib/store';
-import { Task, TaskStatus, Priority, statusLabels, priorityColors } from '@/lib/types';
+import { Task, TaskStatus, Priority, ProjectPhase, statusLabels, priorityColors, phaseLabels, phaseColors } from '@/lib/types';
 
 const columns: { status: TaskStatus; color: string }[] = [
   { status: 'not_started', color: '#64748B' },
@@ -16,6 +16,7 @@ export default function TaskBoard() {
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
+  const [phaseFilter, setPhaseFilter] = useState<ProjectPhase | 'all'>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -26,7 +27,8 @@ export default function TaskBoard() {
     const matchesSearch = task.title.toLowerCase().includes(search.toLowerCase());
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
     const matchesAssignee = assigneeFilter === 'all' || task.assigneeId === assigneeFilter;
-    return matchesSearch && matchesPriority && matchesAssignee;
+    const matchesPhase = phaseFilter === 'all' || task.phase === phaseFilter;
+    return matchesSearch && matchesPriority && matchesAssignee && matchesPhase;
   });
 
   const getTasksByStatus = (status: TaskStatus) => filteredTasks.filter(t => t.status === status);
@@ -45,6 +47,7 @@ export default function TaskBoard() {
         projectId: task.projectId || '1',
         dueDate: task.dueDate || new Date().toISOString().split('T')[0],
         createdAt: new Date().toISOString(),
+        phase: task.phase || 'installation',
       };
       setTasks([...tasks, newTask]);
     }
@@ -90,6 +93,16 @@ export default function TaskBoard() {
           <option value="all">All Assignees</option>
           {team.map(m => (
             <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+        <select
+          value={phaseFilter}
+          onChange={(e) => setPhaseFilter(e.target.value as ProjectPhase | 'all')}
+          className="px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+        >
+          <option value="all">All Phases</option>
+          {(Object.keys(phaseLabels) as ProjectPhase[]).map(p => (
+            <option key={p} value={p}>{phaseLabels[p]}</option>
           ))}
         </select>
       </div>
@@ -140,15 +153,24 @@ function TaskCard({ task, memberName, memberAvatar, onEdit }: { task: Task; memb
         <h4 className="font-medium text-slate-700 text-sm line-clamp-2">{task.title}</h4>
       </div>
       <p className="text-xs text-slate-500 mb-3 line-clamp-2">{task.description}</p>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-1.5 mb-2">
         <span
-          className="text-xs px-2 py-1 rounded font-medium"
+          className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+          style={{ backgroundColor: `${phaseColors[task.phase]}15`, color: phaseColors[task.phase] }}
+        >
+          {phaseLabels[task.phase]}
+        </span>
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded font-medium"
           style={{ backgroundColor: `${priorityColors[task.priority]}20`, color: priorityColors[task.priority] }}
         >
           {task.priority}
         </span>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">{new Date(task.dueDate).toLocaleDateString()}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-400">{new Date(task.dueDate).toLocaleDateString()}</span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-slate-500">{memberName.split(' ')[0]}</span>
           <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-medium text-slate-600">
             {memberAvatar}
           </div>
@@ -167,6 +189,7 @@ function TaskModal({ task, onSave, onClose }: { task: Task | null; onSave: (task
     assigneeId: '1',
     projectId: '1',
     dueDate: new Date().toISOString().split('T')[0],
+    phase: 'installation',
   });
 
   return (
@@ -219,14 +242,28 @@ function TaskModal({ task, onSave, onClose }: { task: Task | null; onSave: (task
               </select>
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
-            <input
-              type="date"
-              value={form.dueDate}
-              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Phase</label>
+              <select
+                value={form.phase}
+                onChange={(e) => setForm({ ...form, phase: e.target.value as ProjectPhase })}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                {(Object.keys(phaseLabels) as ProjectPhase[]).map(p => (
+                  <option key={p} value={p}>{phaseLabels[p]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
+              <input
+                type="date"
+                value={form.dueDate}
+                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
